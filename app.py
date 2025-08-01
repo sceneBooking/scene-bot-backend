@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Excel load
-df = pd.read_excel("Scene_Activities_By_Location.xlsx")
+df = pd.read_excel("scenedataset.xlsx")
 documents = [Document(page_content=" ".join([str(cell) for cell in row if pd.notnull(cell)])) for _, row in df.iterrows()]
 chunks = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=100).split_documents(documents)
 
