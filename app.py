@@ -11,6 +11,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import PromptTemplate
 import os
 import logging
+import re
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -30,20 +31,22 @@ app.add_middleware(
 )
 
 # Excel and chunking
-df = pd.read_excel("amirfinal.xlsx")
+df = pd.read_excel("DATASET.xlsx")
 documents = [Document(page_content=" ".join([str(cell) for cell in row if pd.notnull(cell)])) for _, row in df.iterrows()]
 chunks = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=100).split_documents(documents)
 
 # Embedding and FAISS
-embedding_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+embedding_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
 vector_store = FAISS.from_documents(chunks, embedding_model)
 
 # LLM + Prompt
-llm = ChatGoogleGenerativeAI(model="models/gemini-2.0-flash", temperature=0.2)
+llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-pro", temperature=0.2)
 prompt = PromptTemplate.from_template("""
 You are Scene Bot 🎉, a friendly and fun e-commerce assistant for an entertainment platform!
 Always sound excited, use emojis, and call the user by their name: {name}.
 Use only the dataset and stay relevant to the user's location: {location}.
+WHEN USER ASK FOR LINK GIVE THEM A LINK OF THE ACTIVITY CORRECTLY MENTIONED IN THE DATASET.
+When you mention any URLs or links, format them as clickable links using HTML format: <a href="URL" target="_blank">Link Text</a>
 📚 Context from past chat: {history}
 📍 Location-based results: {context}
 ❓ Question: {input}
@@ -57,6 +60,26 @@ sessions = {}
 class Query(BaseModel):
     question: str
     session_id: str
+
+def make_links_clickable(text):
+    """Convert URLs in text to clickable HTML links, avoiding double-processing"""
+    # First, check if the text already contains HTML links
+    if '<a href=' in text:
+        return text  # Already has HTML links, don't process further
+    
+    # Pattern to match URLs that are NOT already in HTML tags
+    url_pattern = r'(?<!href=")(?<!href=\')(?<!>)(https?://[^\s<>"]+|www\.[^\s<>"]+)(?!</a>)'
+    
+    def replace_url(match):
+        url = match.group(1)
+        # Add https:// if it starts with www.
+        if url.startswith('www.'):
+            full_url = 'https://' + url
+        else:
+            full_url = url
+        return f'<a href="{full_url}" target="_blank">{url}</a>'
+    
+    return re.sub(url_pattern, replace_url, text)
 
 @app.post("/query")
 def query(q: Query):
@@ -92,6 +115,11 @@ def query(q: Query):
     # Chat stage
     location = session["location"].lower()
     filtered_docs = [doc for doc in chunks if location in doc.page_content.lower()]
+    
+    # If no location-specific docs found, use all docs
+    if not filtered_docs:
+        filtered_docs = chunks
+    
     top_docs = FAISS.from_documents(filtered_docs, embedding_model).similarity_search(q.question, k=5)
 
     # Use session memory
@@ -105,9 +133,12 @@ def query(q: Query):
         "history": past_history
     })
 
+    # Make links clickable in the reply
+    clickable_reply = make_links_clickable(reply)
+
     # Update session
-    session["history"].append({"user": q.question, "bot": reply})
-    return {"answer": reply}
+    session["history"].append({"user": q.question, "bot": clickable_reply})
+    return {"answer": clickable_reply}
 
 @app.get("/reset/{session_id}")
 def reset_session(session_id: str):
@@ -122,3 +153,6 @@ def extract_name(text):
 def extract_location(text):
     words = text.strip().split()
     return words[-1].capitalize() if words else "Somewhere"
+
+
+
