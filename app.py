@@ -40,7 +40,7 @@ embedding_model = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004"
 vector_store = FAISS.from_documents(chunks, embedding_model)
 
 # LLM + Prompt
-llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-pro", temperature=0.2)
+llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-pro", temperature=0)
 prompt = PromptTemplate.from_template("""
 You are Scene Bot 🎉, a friendly booking assistant for Scene Booking platform!
 Scene Booking is a platform for activities, workshops, and events across Chennai, Hyderabad, Coimbatore, and Pondicherry.
