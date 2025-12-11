@@ -17,7 +17,7 @@ import re
 logging.basicConfig(level=logging.INFO)
 
 # API key
-os.environ["GOOGLE_API_KEY"] = "AIzaSyC9mr7-JTjX6ZlHVfGzxRZ1StM2QCBIKCg"
+os.environ["GOOGLE_API_KEY"] = "AIzaSyDWZsEB58GxcAQ9f9Sw12cVlWEh0VuHbsc"
 
 app = FastAPI()
 
